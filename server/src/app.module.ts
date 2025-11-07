@@ -7,10 +7,6 @@ import { UsersModule } from './users/users.module';
 import { ReservationsModule } from './reservations/reservations.module';
 
 // import entities ของแต่ละ module
-import { Concert } from './concerts/entities/concert.entity';
-import { User } from './users/entities/user.entity';
-import { Reservation } from './reservations/entities/reservation.entity';
-
 @Module({
   imports: [
     // 🧩 เชื่อมต่อกับ PostgreSQL ผ่าน TypeORM
@@ -21,8 +17,9 @@ import { Reservation } from './reservations/entities/reservation.entity';
       username: 'postgres', // ต้องตรงกับค่าใน docker run
       password: 'password', // ต้องตรงกับค่าใน docker run
       database: 'concert_app', // ต้องตรงกับ POSTGRES_DB
-      entities: [User, Concert, Reservation], // ใส่ entity ทั้งหมด
       synchronize: true, // ให้ TypeORM สร้าง table อัตโนมัติ (เปิดเฉพาะตอน dev)
+      dropSchema: true,
+      autoLoadEntities: true,
     }),
 
     // 🧱 รวม modules ของคุณ
