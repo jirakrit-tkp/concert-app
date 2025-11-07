@@ -1,4 +1,6 @@
-import { PartialType } from '@nestjs/mapped-types';
-import { CreateReservationDto } from './create-reservation.dto';
+import { IsIn } from 'class-validator';
 
-export class UpdateReservationDto extends PartialType(CreateReservationDto) {}
+export class UpdateReservationDto {
+  @IsIn(['reserved', 'cancelled'])
+  status: 'reserved' | 'cancelled';
+}

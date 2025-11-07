@@ -18,7 +18,7 @@ import { ReservationsModule } from './reservations/reservations.module';
       password: 'password', // ต้องตรงกับค่าใน docker run
       database: 'concert_app', // ต้องตรงกับ POSTGRES_DB
       synchronize: true, // ให้ TypeORM สร้าง table อัตโนมัติ (เปิดเฉพาะตอน dev)
-      dropSchema: true,
+      // dropSchema: true,
       autoLoadEntities: true,
     }),
 

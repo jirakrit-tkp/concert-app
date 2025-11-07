@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, ParseIntPipe, Post, Put } from '@nestjs/common';
 import { ConcertsService } from './concerts.service';
 import { CreateConcertDto } from './dto/create-concert.dto';
 import { UpdateConcertDto } from './dto/update-concert.dto';
@@ -18,17 +18,17 @@ export class ConcertsController {
   }
 
   @Get(':id')
-  findOne(@Param('id') id: string) {
-    return this.concertsService.findOne(+id);
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.concertsService.findOne(id);
   }
 
-  @Patch(':id')
-  update(@Param('id') id: string, @Body() updateConcertDto: UpdateConcertDto) {
-    return this.concertsService.update(+id, updateConcertDto);
+  @Put(':id')
+  update(@Param('id', ParseIntPipe) id: number, @Body() updateConcertDto: UpdateConcertDto) {
+    return this.concertsService.update(id, updateConcertDto);
   }
 
   @Delete(':id')
-  remove(@Param('id') id: string) {
-    return this.concertsService.remove(+id);
+  remove(@Param('id', ParseIntPipe) id: number) {
+    return this.concertsService.remove(id);
   }
 }
