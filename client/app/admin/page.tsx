@@ -9,6 +9,7 @@ import Snackbar from '../components/Snackbar';
 import ConfirmModal from '../components/ConfirmModal';
 import { API_BASE_URL } from '../config';
 import type { AppUser, Concert, Reservation } from '../types/api';
+import { extractErrorMessage, resolveErrorMessage } from '../utils/http';
 
 StatCard.displayName = 'StatCard';
 
@@ -67,7 +68,8 @@ const AdminHomePage = () => {
     router.replace('/login');
   }, [clearStatusMessages, router]);
 
-  const handleError = useCallback((message: string, err: unknown) => {
+  const handleError = useCallback((fallback: string, err?: unknown) => {
+    const message = resolveErrorMessage(err, fallback);
     console.error(message, err);
     setError(message);
   }, []);
@@ -76,7 +78,8 @@ const AdminHomePage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/concerts`);
       if (!response.ok) {
-        throw new Error('Failed to load concerts');
+        const message = await extractErrorMessage(response, 'Unable to load concerts');
+        throw new Error(message);
       }
       const data: Concert[] = await response.json();
       setConcerts(data);
@@ -89,7 +92,8 @@ const AdminHomePage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/reservations`);
       if (!response.ok) {
-        throw new Error('Failed to load reservations');
+        const message = await extractErrorMessage(response, 'Unable to load reservations');
+        throw new Error(message);
       }
       const data: Reservation[] = await response.json();
       setReservations(data);
@@ -153,7 +157,7 @@ const AdminHomePage = () => {
         });
 
         if (!response.ok) {
-          const message = await response.text();
+          const message = await extractErrorMessage(response, 'Unable to create concert');
           throw new Error(message);
         }
 
@@ -177,7 +181,7 @@ const AdminHomePage = () => {
         });
 
         if (!response.ok) {
-          const message = await response.text();
+          const message = await extractErrorMessage(response, 'Unable to delete concert');
           throw new Error(message);
         }
 

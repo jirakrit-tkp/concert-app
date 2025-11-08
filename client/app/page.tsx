@@ -7,6 +7,7 @@ import SidebarLayout, { SidebarItem } from './components/SidebarLayout';
 import { API_BASE_URL } from './config';
 import type { AppUser, Concert, Reservation } from './types/api';
 import Snackbar from './components/Snackbar';
+import { extractErrorMessage, resolveErrorMessage } from './utils/http';
 
 const UserHomePage = () => {
   const router = useRouter();
@@ -48,7 +49,8 @@ const UserHomePage = () => {
     router.replace('/login');
   }, [clearStatusMessages, router]);
 
-  const handleError = useCallback((message: string, err: unknown) => {
+  const handleError = useCallback((fallback: string, err?: unknown) => {
+    const message = resolveErrorMessage(err, fallback);
     console.error(message, err);
     setError(message);
   }, []);
@@ -57,7 +59,8 @@ const UserHomePage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/concerts`);
       if (!response.ok) {
-        throw new Error('Failed to load concerts');
+        const message = await extractErrorMessage(response, 'Unable to load concerts');
+        throw new Error(message);
       }
       const data: Concert[] = await response.json();
       setConcerts(data);
@@ -70,7 +73,8 @@ const UserHomePage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/reservations`);
       if (!response.ok) {
-        throw new Error('Failed to load reservations');
+        const message = await extractErrorMessage(response, 'Unable to load reservations');
+        throw new Error(message);
       }
       const data: Reservation[] = await response.json();
       setReservations(data);
@@ -128,7 +132,7 @@ const UserHomePage = () => {
           });
 
           if (!response.ok) {
-            const message = await response.text();
+            const message = await extractErrorMessage(response, 'Unable to reserve seat');
             throw new Error(message);
           }
         } else if (existingReservation.status === 'cancelled') {
@@ -141,7 +145,7 @@ const UserHomePage = () => {
           });
 
           if (!response.ok) {
-            const message = await response.text();
+            const message = await extractErrorMessage(response, 'Unable to reserve seat');
             throw new Error(message);
           }
         } else {
@@ -182,7 +186,7 @@ const UserHomePage = () => {
         });
 
         if (!response.ok) {
-          const message = await response.text();
+          const message = await extractErrorMessage(response, 'Unable to cancel reservation');
           throw new Error(message);
         }
 

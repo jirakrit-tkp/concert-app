@@ -4,8 +4,10 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { House, Inbox, LogOut, RefreshCcw } from 'lucide-react';
 import SidebarLayout, { SidebarItem } from '../../components/SidebarLayout';
+import Snackbar from '../../components/Snackbar';
 import { API_BASE_URL } from '../../config';
 import type { AppUser, Reservation } from '../../types/api';
+import { extractErrorMessage, resolveErrorMessage } from '../../utils/http';
 
 const transformToDisplayDate = (input: string) => {
   const date = new Date(input);
@@ -50,7 +52,8 @@ const AdminHistoryPage = () => {
     router.replace('/login');
   }, [router]);
 
-  const handleError = useCallback((message: string, err: unknown) => {
+  const handleError = useCallback((fallback: string, err?: unknown) => {
+    const message = resolveErrorMessage(err, fallback);
     console.error(message, err);
     setError(message);
   }, []);
@@ -59,7 +62,8 @@ const AdminHistoryPage = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/reservations`);
       if (!response.ok) {
-        throw new Error('Failed to load reservations');
+        const message = await extractErrorMessage(response, 'Unable to load reservations');
+        throw new Error(message);
       }
       const data: Reservation[] = await response.json();
       setReservations(data);
@@ -78,6 +82,15 @@ const AdminHistoryPage = () => {
       .catch((err) => console.error('Initial load error', err))
       .finally(() => setIsLoading(false));
   }, [authUser, fetchReservations]);
+
+  useEffect(() => {
+    if (!error) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => setError(null), 4000);
+    return () => window.clearTimeout(timeout);
+  }, [error]);
 
   const sidebarItems = useMemo<SidebarItem[]>(
     () => [
@@ -130,11 +143,6 @@ const AdminHistoryPage = () => {
       {isLoading ? (
         <p className="text-sm text-zinc-500">กำลังโหลดข้อมูล...</p>
       ) : null}
-      {error ? (
-        <div className="mb-4 rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-          {error}
-        </div>
-      ) : null}
       <section className="rounded-lg border border-zinc-200 bg-white shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full min-w-[480px] table-auto border-collapse text-sm">
@@ -168,6 +176,7 @@ const AdminHistoryPage = () => {
           </table>
         </div>
       </section>
+      <Snackbar message={error} tone="danger" onDismiss={() => setError(null)} />
     </SidebarLayout>
   );
 };
