@@ -59,8 +59,8 @@ const SidebarLayout = ({
   );
 
   return (
-    <div className="flex min-h-screen flex-col bg-zinc-100 text-zinc-900 md:flex-row">
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 md:hidden">
+    <div className="relative flex min-h-screen flex-col bg-zinc-100 text-zinc-900 md:flex-row md:items-stretch">
+      <header className="sticky top-0 z-40 flex items-center justify-between border-b border-zinc-200 bg-white px-6 py-4 md:hidden">
         <button
           type="button"
           aria-label="Toggle navigation"
@@ -94,7 +94,7 @@ const SidebarLayout = ({
         </div>
       ) : null}
 
-      <aside className="hidden w-64 flex-col justify-between border-r border-zinc-200 bg-white px-6 py-8 md:flex">
+      <aside className="hidden w-64 border-r border-zinc-200 bg-white px-6 py-8 md:sticky md:top-0 md:flex md:h-screen md:flex-col md:justify-between md:overflow-y-auto">
         <div>
           <header className="mb-10 text-2xl font-semibold text-zinc-800">{title}</header>
           <nav>{renderItems(items, 'bg-sky-100 text-sky-700')}</nav>
@@ -104,7 +104,9 @@ const SidebarLayout = ({
         ) : null}
       </aside>
 
-      <section className="flex-1 overflow-y-auto bg-zinc-50 px-5 py-8 md:px-10 md:py-10">{children}</section>
+      <section className="flex-1 bg-zinc-50 px-5 py-8 md:max-h-screen md:overflow-y-auto md:px-10 md:py-10">
+        {children}
+      </section>
     </div>
   );
 };

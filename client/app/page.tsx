@@ -1,7 +1,8 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Award, CircleX, House, Inbox, RefreshCcw, Save, Trash2, User } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { House, Inbox, LogOut, RefreshCcw, Save, Trash2, User } from 'lucide-react';
 import SidebarLayout, { SidebarItem } from './components/SidebarLayout';
 import StatCard from './components/StatCard';
 
@@ -34,11 +35,12 @@ interface Reservation {
   };
 }
 
-interface User {
+type AppUser = {
   id: number;
   name: string;
   email: string;
-}
+  role: 'admin' | 'user';
+};
 
 const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001') + '/api';
 
@@ -55,24 +57,25 @@ const transformToDisplayDate = (input: string) => {
 const panelIds: Panel[] = ['admin-home', 'admin-history', 'user-home'];
 
 const adminNavItems: SidebarItem[] = [
-  { id: 'admin-home', label: 'Overview', icon: <House size={16} aria-hidden="true" /> },
+  { id: 'admin-home', label: 'Home', icon: <House size={16} aria-hidden="true" /> },
   { id: 'admin-history', label: 'History', icon: <Inbox size={16} aria-hidden="true" /> },
   { id: 'user-home', label: 'Switch to User', icon: <RefreshCcw size={16} aria-hidden="true" /> },
 ];
 
-const userNavItems: SidebarItem[] = [
-  { id: 'user-home', label: 'View Concerts', icon: <House size={16} aria-hidden="true" /> },
+const adminUserNavItems: SidebarItem[] = [
+  { id: 'user-home', label: 'Home', icon: <House size={16} aria-hidden="true" /> },
   { id: 'admin-home', label: 'Switch to Admin', icon: <RefreshCcw size={16} aria-hidden="true" /> },
 ];
 
-const footerItems: SidebarItem[] = [];
+const userNavItems: SidebarItem[] = [{ id: 'user-home', label: 'Home', icon: <House size={16} aria-hidden="true" /> }];
 
 const Home = () => {
+  const router = useRouter();
   const [activePanel, setActivePanel] = useState<Panel>('admin-home');
   const [adminTab, setAdminTab] = useState<AdminTab>('overview');
   const [concerts, setConcerts] = useState<Concert[]>([]);
   const [reservations, setReservations] = useState<Reservation[]>([]);
-  const [users, setUsers] = useState<User[]>([]);
+  const [users, setUsers] = useState<AppUser[]>([]);
   const [selectedUserId, setSelectedUserId] = useState<number | null>(null);
   const [feedback, setFeedback] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -82,11 +85,53 @@ const Home = () => {
     description: '',
     totalSeats: '',
   });
+  const [authUser, setAuthUser] = useState<AppUser | null>(null);
+
+  useEffect(() => {
+    const storedUser = localStorage.getItem('authUser');
+    if (!storedUser) {
+      router.replace('/login');
+      return;
+    }
+
+    try {
+      const parsed: AppUser = JSON.parse(storedUser);
+      setAuthUser(parsed);
+      setActivePanel(parsed.role === 'user' ? 'user-home' : 'admin-home');
+      setSelectedUserId(parsed.id);
+    } catch (err) {
+      console.error('Failed to parse stored user', err);
+      localStorage.removeItem('authUser');
+      router.replace('/login');
+    }
+  }, [router]);
+
+  const footerItems = useMemo<SidebarItem[]>(() => {
+    if (!authUser) {
+      return [];
+    }
+
+    return [
+      {
+        id: 'logout',
+        label: 'Logout',
+        icon: <LogOut size={16} aria-hidden="true" />,
+      },
+    ];
+  }, [authUser]);
 
   const clearStatusMessages = useCallback(() => {
     setFeedback(null);
     setError(null);
   }, []);
+
+  const handleLogout = useCallback(() => {
+    clearStatusMessages();
+    localStorage.removeItem('authUser');
+    setAuthUser(null);
+    setSelectedUserId(null);
+    router.replace('/login');
+  }, [clearStatusMessages, router]);
 
   const handleError = useCallback((message: string, err: unknown) => {
     console.error(message, err);
@@ -120,41 +165,64 @@ const Home = () => {
   }, [handleError]);
 
   const fetchUsers = useCallback(async () => {
+    if (authUser?.role !== 'admin') {
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE_URL}/users`);
       if (!response.ok) {
         throw new Error('Failed to load users');
       }
-      const data: User[] = await response.json();
+      const data: AppUser[] = await response.json();
       setUsers(data);
       setSelectedUserId((previous) => {
         if (previous !== null) {
           return previous;
+        }
+        const matchingUser = data.find((user) => authUser && user.id === authUser.id);
+        if (matchingUser) {
+          return matchingUser.id;
         }
         return data.length > 0 ? data[0].id : null;
       });
     } catch (err) {
       handleError('Unable to load users', err);
     }
-  }, [handleError]);
+  }, [authUser, handleError]);
 
   const currentUser = useMemo(() => {
+    if (authUser === null) {
+      return null;
+    }
+    if (authUser.role === 'user') {
+      return authUser;
+    }
     if (selectedUserId === null) {
       return null;
     }
     return users.find((user) => user.id === selectedUserId) ?? null;
-  }, [selectedUserId, users]);
+  }, [authUser, selectedUserId, users]);
 
   const refreshConcertsAndReservations = useCallback(async () => {
     await Promise.all([fetchConcerts(), fetchReservations()]);
   }, [fetchConcerts, fetchReservations]);
 
   useEffect(() => {
+    if (authUser === null) {
+      return;
+    }
+
     setIsLoading(true);
-    Promise.all([fetchConcerts(), fetchReservations(), fetchUsers()])
+    const requests =
+      authUser.role === 'admin'
+        ? [fetchConcerts(), fetchReservations(), fetchUsers()]
+        : [fetchConcerts(), fetchReservations()];
+
+    Promise.all(requests)
       .catch((err) => console.error('Initial load error', err))
       .finally(() => setIsLoading(false));
-  }, [fetchConcerts, fetchReservations, fetchUsers]);
+  }, [authUser, fetchConcerts, fetchReservations, fetchUsers]);
 
   const totalSeats = useMemo(
     () => concerts.reduce((sum, concert) => sum + concert.total_seats, 0),
@@ -173,21 +241,39 @@ const Home = () => {
 
   const handleNavigation = useCallback(
     (id: string) => {
+      if (id === 'logout') {
+        handleLogout();
+        return;
+      }
+
       clearStatusMessages();
-      if (panelIds.includes(id as Panel)) {
-        setActivePanel(id as Panel);
-        if (id === 'user-home') {
-          setAdminTab('overview');
-          setSelectedUserId((previous) => {
-            if (previous !== null) {
-              return previous;
-            }
-            return users.length > 0 ? users[0].id : null;
-          });
-        }
+      if (!panelIds.includes(id as Panel)) {
+        return;
+      }
+
+      if (authUser?.role !== 'admin' && id !== 'user-home') {
+        return;
+      }
+
+      setActivePanel(id as Panel);
+
+      if (id === 'user-home') {
+        setAdminTab('overview');
+        setSelectedUserId((previous) => {
+          if (authUser?.role === 'user') {
+            return authUser.id;
+          }
+          if (previous !== null) {
+            return previous;
+          }
+          if (users.length > 0) {
+            return users[0].id;
+          }
+          return authUser?.id ?? null;
+        });
       }
     },
-    [clearStatusMessages, users],
+    [authUser, clearStatusMessages, handleLogout, users],
   );
 
   const handleCreateConcert = useCallback(
@@ -400,7 +486,7 @@ const Home = () => {
                 </div>
                 <button
                   type="button"
-                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-1 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-2 sm:w-auto"
+                  className="flex w-full items-center justify-center gap-2 rounded-lg bg-red-1 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-2 sm:w-auto sm:min-w-[160px]"
                   onClick={() => handleDeleteConcert(concert.id)}
                 >
                   <Trash2 size={16} aria-hidden="true" />
@@ -463,7 +549,7 @@ const Home = () => {
             <div className="flex flex-col items-stretch justify-end gap-3 sm:flex-row">
               <button
                 type="submit"
-                className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-700 sm:w-auto"
+                className="flex w-full items-center justify-center gap-2 rounded-lg bg-sky-600 px-6 py-2 text-sm font-semibold text-white transition-colors hover:bg-sky-700 sm:w-auto sm:min-w-[160px]"
               >
                 <Save size={16} aria-hidden="true" />
                 Save
@@ -530,36 +616,31 @@ const Home = () => {
           const reservation = currentUser === null ? undefined : getReservationForConcert(concert.id, currentUser.id);
           const isReserved = reservation?.status === 'reserved';
           const buttonLabel = isReserved ? 'Cancel' : 'Reserve';
-          const buttonStyle = isReserved ? 'bg-rose-500 hover:bg-rose-600' : 'bg-sky-600 hover:bg-sky-700';
-          const buttonIcon = isReserved ? (
-            <CircleX size={16} aria-hidden="true" />
-          ) : (
-            <Award size={16} aria-hidden="true" />
-          );
+          const buttonStyle = isReserved ? 'bg-red-1 hover:bg-red-2' : 'bg-sky-600 hover:bg-sky-700';
           const onClickHandler = isReserved ? () => cancelReservation(concert.id) : () => reserveSeat(concert.id);
 
           return (
             <article key={concert.id} className="rounded-lg border border-zinc-200 bg-white p-6 shadow-sm">
-              <header className="mb-3 flex items-start justify-between">
-                <div>
-                  <h3 className="text-lg font-semibold text-sky-700">{concert.name}</h3>
-                  <p className="mt-1 text-sm text-zinc-600">{concert.description}</p>
+              <header className="mb-6">
+                <h3 className="text-xl font-semibold text-blue-2">{concert.name}</h3>
+                <div className="mt-4 border-t border-zinc-200" />
+                <p className="mt-3 text-sm text-zinc-600 wrap-break-word">{concert.description}</p>
+              </header>
+              <footer className="flex flex-col gap-4 text-sm text-zinc-600 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-center gap-2">
+                  <User size={16} aria-hidden="true" className="text-zinc-400" />
+                  <span className="font-semibold text-zinc-700">{concert.total_seats}</span>
+                  <span className="mx-2 text-zinc-300">|</span>
+                  <span className="text-zinc-500">Available {concert.available_seats}</span>
                 </div>
                 <button
                   type="button"
-                  className={`flex items-center gap-2 rounded-md px-4 py-2 text-sm font-semibold text-white transition-colors ${buttonStyle}`}
+                  className={`flex w-full items-center justify-center rounded-lg px-4 py-2 text-sm font-semibold text-white transition-colors sm:w-auto sm:min-w-[160px] ${buttonStyle}`}
                   onClick={onClickHandler}
                   disabled={currentUser === null}
                 >
-                  {buttonIcon}
                   {buttonLabel}
                 </button>
-              </header>
-              <footer className="flex items-center gap-2 text-sm text-zinc-500">
-                <User size={16} aria-hidden="true" className="text-zinc-400" />
-                <span>{concert.total_seats}</span>
-                <span className="mx-2 text-zinc-300">|</span>
-                <span>Available {concert.available_seats}</span>
               </footer>
             </article>
           );
@@ -573,7 +654,16 @@ const Home = () => {
     </section>
   );
 
-  const sidebarItems = activePanel === 'user-home' ? userNavItems : adminNavItems;
+  const sidebarItems = useMemo(() => {
+    if (authUser?.role === 'admin') {
+      return activePanel === 'user-home' ? adminUserNavItems : adminNavItems;
+    }
+    return userNavItems;
+  }, [activePanel, authUser]);
+
+  if (authUser === null) {
+    return null;
+  }
 
   return (
     <SidebarLayout title={activePanel === 'user-home' ? 'User' : 'Admin'} items={sidebarItems} activeId={activePanel} onSelect={handleNavigation} footerItems={footerItems}>
