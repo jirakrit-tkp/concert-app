@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { API_BASE_URL } from '../config';
 
 type LoginResponse = {
   id: number;
@@ -9,8 +10,6 @@ type LoginResponse = {
   email: string;
   role: 'admin' | 'user';
 };
-
-const API_BASE_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? 'http://localhost:3001') + '/api';
 
 const LoginPage = () => {
   const router = useRouter();
@@ -21,8 +20,16 @@ const LoginPage = () => {
 
   useEffect(() => {
     const storedUser = localStorage.getItem('authUser');
-    if (storedUser) {
-      router.replace('/');
+    if (!storedUser) {
+      return;
+    }
+
+    try {
+      const parsed: LoginResponse = JSON.parse(storedUser);
+      router.replace(parsed.role === 'admin' ? '/admin' : '/');
+    } catch (err) {
+      console.error('Failed to parse stored user', err);
+      localStorage.removeItem('authUser');
     }
   }, [router]);
 
@@ -46,7 +53,7 @@ const LoginPage = () => {
 
       const data: LoginResponse = await response.json();
       localStorage.setItem('authUser', JSON.stringify(data));
-      router.replace('/');
+      router.replace(data.role === 'admin' ? '/admin' : '/');
     } catch (err) {
       console.error('Login failed', err);
       setError('Invalid email or password');
