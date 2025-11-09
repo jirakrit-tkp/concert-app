@@ -3,9 +3,24 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  --blue-1: #0070a4;
+  --blue-2: #1692ec;
+  --green-1: #00a58b;
+  --red-1: #e84e4e;
+  --red-2: #e63946;
 }
 
-@theme inline {
+@theme {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-blue-1: #0070a4;
+  --color-blue-2: #1692ec;
+  --color-green-1: #00a58b;
+  --color-red-1: #e84e4e;
+  --color-red-2: #e63946;
+}
+
+:root {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
