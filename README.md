@@ -126,6 +126,8 @@ cd client && npm run dev
 cd server && npm run start:dev
 ```
 
+> **Registration note:** Signing up through the UI always provisions a standard `user` role. If you need an admin account, update the corresponding record’s role directly in the database.
+
 ---
 
 ## 5. Error Handling & Validation
